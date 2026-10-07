@@ -27,5 +27,23 @@ def view_product(product_id: str) -> dict:
     return gateway.view_product(product_id)
 
 
+@server.tool()
+def add_to_cart(product_id: str) -> dict:
+    """Add a product to the shopping cart."""
+    return gateway.add_to_cart(product_id)
+
+
+@server.tool()
+def view_cart() -> dict:
+    """Show the items in the cart and the total, including shipping."""
+    return gateway.view_cart()
+
+
+@server.tool()
+def checkout() -> dict:
+    """Pay for everything in the cart."""
+    return gateway.checkout()
+
+
 if __name__ == "__main__":
     server.run(transport="stdio")
