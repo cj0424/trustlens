@@ -1,7 +1,12 @@
 """TrustLens MCP server: exposes the gateway's tools to any AI agent over MCP.
 
 The agent never touches the shops or PayPal directly. It can only call
-these tools, and every call goes through the TrustLens gateway."""
+these tools, and every call goes through the TrustLens gateway.
+
+Who the user is and what they asked for is given to TrustLens by the program
+that starts the errand (environment variables), never by the agent itself."""
+
+import os
 
 try:
     from mcp.server.mcpserver import MCPServer as McpServer
@@ -10,7 +15,10 @@ except ImportError:
 
 from app.gateway import Gateway
 
-gateway = Gateway()
+gateway = Gateway(
+    user_id=os.getenv("TRUSTLENS_USER", "demo-user"),
+    request=os.getenv("TRUSTLENS_REQUEST"),
+)
 server = McpServer("TrustLens")
 
 

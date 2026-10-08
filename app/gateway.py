@@ -1,31 +1,39 @@
 """TrustLens gateway: the AI agent's only door to the shops (and, later, PayPal).
 
-Every action the agent takes goes through here and is recorded in the event log.
+Every action is saved in the shared record (app/record.py), linked to one
+errand: who the user is and what they asked for. Later steps (Detect,
+Verify, Decide, Enforce, Learn) read and write the same record.
 
 Current version: UNPROTECTED checkout. It records who would receive the money,
-without any checks and without PayPal. Later steps replace it with the
-payment gate, and add the shield and the bait."""
+without any checks and without PayPal. Step 26 replaces it with Enforce."""
 
 from datetime import datetime, timezone
 
+from app.record import Record
 from app.shop_world import ShopWorld
 
 
 class Gateway:
-    def __init__(self, world=None):
+    def __init__(self, world=None, record=None, user_id="demo-user", request=None):
         self.world = world or ShopWorld()
+        self.record = record or Record()
         self.events = []
         self.cart = []
         self.payments = []
+        self.user_id = user_id
+        self.request = request or "(no request given)"
+        self.errand_id = self.record.start_errand(self.user_id, self.request)
 
-    def _log(self, kind, details):
-        """Record one event. This log feeds the protection feed later."""
+    def _log(self, kind, details, step="agent"):
+        """Record one event, in memory and in the shared record."""
         event = {
             "time": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "step": step,
             "kind": kind,
             **details,
         }
         self.events.append(event)
+        self.record.add_event(self.errand_id, step, kind, details)
         return event
 
     # ---- Tools the agent is allowed to use ----
@@ -35,7 +43,11 @@ class Gateway:
         results = self.world.search(query, max_price_eur)
         self._log(
             "search",
-            {"query": query, "max_price_eur": max_price_eur, "results": len(results)},
+            {
+                "query": query,
+                "max_price_eur": max_price_eur,
+                "results": [result["product_id"] for result in results],
+            },
         )
         return results
 
@@ -84,7 +96,6 @@ class Gateway:
         if not self.cart:
             return {"error": "The cart is empty."}
 
-        # Group the cart by who receives the money
         amounts = {}
         for product_id in self.cart:
             product = self.world.products[product_id]
@@ -101,4 +112,5 @@ class Gateway:
             paid.append(payment)
 
         self.cart = []
+        self.record.finish_errand(self.errand_id, "paid")
         return {"status": "paid", "payments": paid}
